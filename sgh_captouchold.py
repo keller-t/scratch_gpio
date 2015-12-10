@@ -148,7 +148,7 @@ class StoppableThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.stop_event = threading.Event()
-        self.daemon = True         
+        self.daemon = True
 
     def start(self):
         if self.isAlive() == False:
@@ -180,13 +180,12 @@ class AsyncWorker(StoppableThread):
 
 class Cap1xxx():
     supported = [PID_CAP1208, PID_CAP1188]
-  
+
     def __init__(self, i2c_addr=DEFAULT_ADDR, i2c_bus=1, on_touch=[None]*8):
         self.async_poll = None
         self.i2c_addr = i2c_addr
         self.i2c = SMBus(i2c_bus)
         self.count = 0
-        self._delta = 50
 
         self.handlers = {
             'press' :[None]*8,
@@ -200,7 +199,7 @@ class Cap1xxx():
         self.input_pressed = [False]*8
         self.repeat_enabled = 0b00000000
         self.release_enabled = 0b11111111
-        
+
         self.product_id = self._get_product_id()
 
         if not self.product_id in self.supported:
@@ -226,18 +225,15 @@ class Cap1xxx():
         whether an input has been triggered since the
         interrupt flag was last cleared."""
         touched = self._read_byte(R_INPUT_STATUS)
-        threshold = self._read_block(R_INPUT_1_THRESH, 8)
-        delta = self._read_block(R_INPUT_1_DELTA, 8)
         #status = ['none'] * 8
         for x in range(8):
             if (1 << x) & touched:
                 status = 'none'
-                _delta = self._get_twos_comp(delta[x]) 
-                #threshold = self._read_byte(R_INPUT_1_THRESH + x)
-                #print('Got event with delta: {}, thresh: {}'.format(_delta, threshold[x]))
+                delta = self._get_twos_comp(self._read_byte(R_INPUT_1_DELTA + x))
+                #print(delta)
                 # We only ever want to detect PRESS events
                 # If repeat is disabled, and release detect is enabled
-                if _delta >= threshold[x]: # self._delta:
+                if delta > 50:
                     #  Touch down event
                     if self.input_status[x] in ['press','held']:
                         if self.repeat_enabled & (1 << x):
@@ -253,7 +249,6 @@ class Cap1xxx():
                         status = 'release'
                     else:
                         status = 'none'
-
                 self.input_status[x] = status
                 self.input_pressed[x] = status in ['press','held','none']
             else:
@@ -265,13 +260,11 @@ class Cap1xxx():
         if ( val & (1<< (8 - 1))) != 0:
             val = val - (1 << 8)
         return val
-        
+
     def clear_interrupt(self):
         """Clear the interrupt flag, bit 0, of the
         main control register"""
-        main = self._read_byte(R_MAIN_CONTROL)
-        main &= ~0b00000001
-        self._write_byte(R_MAIN_CONTROL, main)
+        self._write_byte(R_MAIN_CONTROL, 0b00000000)
 
     def wait_for_interrupt(self, timeout=100):
         """Wait for, interrupt, bit 0 of the main
@@ -284,7 +277,7 @@ class Cap1xxx():
                 return True
             if self._millis() > start + timeout:
                 return False
-            time.sleep(0.000001)
+            time.sleep(0.05)
 
     def on(self, channel=0, event='press', handler=None):
         self.handlers[event][channel] = handler
@@ -305,9 +298,6 @@ class Cap1xxx():
             return True
         return False
 
-    def set_touch_delta(self, delta):
-        self._delta = delta
-
     def set_hold_delay(self, ms):
         """Set time before a press and hold is detected,
         Clamps to multiples of 35 from 35 to 560"""
@@ -317,7 +307,7 @@ class Cap1xxx():
         self._write_byte(R_INPUT_CONFIG2, input_config)
 
     def set_repeat_rate(self, ms):
-        """Set repeat rate in milliseconds, 
+        """Set repeat rate in milliseconds,
         Clamps to multiples of 35 from 35 to 560"""
         repeat_rate = self._calc_touch_rate(ms)
         input_config = self._read_byte(R_INPUT_CONFIG)
@@ -332,17 +322,17 @@ class Cap1xxx():
     def _poll(self):
         """Single polling pass, should be called in
         a loop, preferably threaded."""
-        self.count += 1        
+        self.count += 1
         if self.wait_for_interrupt():
             inputs = self.get_input_status()
             for x in range(8):
                 self._trigger_handler(x, inputs[x])
             self.clear_interrupt()
-        
-            #if self.count > 10:    
+
+            if self.count > 10:
                 # Force recalibration on fruit pads
-            #    self._write_byte(0x26, 0b00001111)
-            #    self.count = 0
+                self._write_byte(0x26, 0b00001111)
+                self.count = 0
 
     def _trigger_handler(self, channel, event):
         if event == 'none':
@@ -378,18 +368,35 @@ class Cap1xxx():
     def _read_byte(self, register):
         return self.i2c.read_byte_data(self.i2c_addr, register)
 
-    def _read_block(self, register, length):
-        return self.i2c.read_i2c_block_data(self.i2c_addr, register, length)
-
     def _millis(self):
         return int(round(time.time() * 1000))
 
     def __del__(self):
         self.stop_watching()
-        
+
 
 class Cap1208(Cap1xxx):
     supported = [PID_CAP1208]
 
 class Cap1188(Cap1xxx):
     supported = [PID_CAP1188]
+
+'''
+bus.write_byte_data(ADDR, INPUT_CONFIG_REG,  0b10100000)
+bus.write_byte_data(ADDR, INPUT_CONFIG_REG2, 0b00000000)
+bus.write_byte_data(ADDR, MULTI_TOUCH_REG,   0b00000000)
+
+while True:
+    int = bus.read_byte_data(ADDR,0)
+    if int & 1:
+        touched = bus.read_byte_data(ADDR,3)
+        bus.write_byte_data(ADDR,0,0)
+        for id, button in buttons.iteritems():
+            if touched & id:
+                print(button)
+                if button in leds.keys():
+                    GPIO.output(leds[button], GPIO.HIGH)
+            else:
+                if button in leds.keys():
+                    GPIO.output(leds[button], GPIO.LOW)
+'''

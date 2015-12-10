@@ -17,7 +17,7 @@
 #Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 # This code hosted on Github thanks to Ben Nuttall who taught me how to be a git(ter)lly
-Version = 'v7.2.002'  #29Nov15  dweet read converted to lower
+Version = 'v7.2.004'  #10DEc12  Fixes for ExplorerHAT
 print "Version:",Version
 import threading
 import socket
@@ -933,9 +933,7 @@ class ScratchSender(threading.Thread):
                     sghCT = sgh_captouch_helper.sgh_captouch_helper()
                     sghGC.capTouchHelper = sghCT
                     print "sghCT", sghCT
-                    import sgh_explorer_analog
-                    sghGC.ADS1015 = sgh_explorer_analog.ADS1015()
-                    print "ADS1015", sghGC.ADS1015
+                    
                     sensor_str = ""
                     for loop in range(0,8):
                         sghGC.capTouch.on(loop,"press",sghCT.ctHandler)
@@ -944,6 +942,13 @@ class ScratchSender(threading.Thread):
                         sensor_name = "touch" + str(sghCT.ctTrigStatus[loop][0])
                         sensor_str += '"%s" %s ' % (sensor_name, sensor_value)
                     msgQueue.put((0,"sensor-update " + sensor_str))
+                    import sgh_explorer_analog  # get the analog inputs module
+                    try:
+                        sghGC.ADS1015 = sgh_explorer_analog.ADS1015()
+                        print "ADS1015", sghGC.ADS1015
+                    except:
+                        print "ExplorerHAT is not Pro"
+                        pass                    
 
                 else:
                     sensor_str = ""
@@ -967,15 +972,16 @@ class ScratchSender(threading.Thread):
                         msgQueue.put((0,'broadcast "Touch"'))
                         sghCT.ctTrigStatus[8][1] = 2
 
-                    sensor_str = ""
-                    if tick % 5 == 0:
-                        for loop in range(0,4):
-                                sensor_name = "analog" + str(4 - loop)
-                                sensor_value =  str(sghGC.ADS1015.read_se_adc(loop))
-                                #print sensor_name,sensor_value
-                                sensor_str += '"%s" %s ' % (sensor_name, sensor_value)
-                        if sensor_str != "":
-                            msgQueue.put((0,"sensor-update " + sensor_str))
+                    if sghGC.ADS1015 is not None:
+                        sensor_str = ""
+                        if tick % 5 == 0:
+                            for loop in range(0,4):
+                                    sensor_name = "analog" + str(4 - loop)
+                                    sensor_value =  str(sghGC.ADS1015.read_se_adc(loop))
+                                    #print sensor_name,sensor_value
+                                    sensor_str += '"%s" %s ' % (sensor_name, sensor_value)
+                            if sensor_str != "":
+                                msgQueue.put((0,"sensor-update " + sensor_str))
 
         print "Sender Stopped"
 
@@ -3668,7 +3674,7 @@ class ScratchListener(threading.Thread):
                         print "pinEvent Detect: ", sghGC.pinEventEnabled
 
                     if self.bFindValue("bright"):
-                        sghGC.ledDim = int(self.valueNumeric) if self.valueIsNumeric else 100
+                        sghGC.ledDim = max(0,min(100,int(self.valueNumeric))) if self.valueIsNumeric else 100
                         PiGlow_Brightness = sghGC.ledDim
                         #print sghGC.ledDim
 
@@ -4314,7 +4320,7 @@ class ScratchListener(threading.Thread):
 
 
                             if self.bFindValue("bright"):
-                                sghGC.ledDim = int(self.valueNumeric) if self.valueIsNumeric else 20
+                                sghGC.ledDim = max(0,min(100,int(self.valueNumeric))) if self.valueIsNumeric else 20
                                 sensor_name = 'bright'
                                 bcast_str = 'sensor-update "%s" %d' % (sensor_name, sghGC.ledDim)
                                 #print 'sending: %s' % bcast_str
@@ -4570,7 +4576,7 @@ class ScratchListener(threading.Thread):
                                 if self.bFindValue("pixelfade"):
                                     values = self.value.split(",")
                                     #print "v,bright",values[0],sghGC.ledDim
-                                    newbright = sghGC.ledDim
+                                    newbright = int(sghGC.ledDim)
                                     newr,newg,newb = findRGB(values[0])
                                     if len(values) > 1:
                                         newbright = int(float(values[1]))
@@ -4588,14 +4594,14 @@ class ScratchListener(threading.Thread):
                                         for index in range(0, self.matrixUse):
                                             UH.set_neopixel(index, self.matrixRed, self.matrixGreen, self.matrixBlue)
                                         #print sghGC.ledDim
-                                        sghGC.ledDim = max(0,min(255,(sghGC.ledDim + brightdelta)))
+                                        sghGC.ledDim = max(0,min(100,(sghGC.ledDim + brightdelta)))
                                         #print sghGC.ledDim
                                         matrixShow()
                                         matrixBright(sghGC.ledDim / 100.0 )
                                         time.sleep(0.05)
                                     self.matrixRed, self.matrixGreen, self.matrixBlue = findRGB(self.value)
                                     UH.set_neopixel(index, self.matrixRed, self.matrixGreen, self.matrixBlue)
-                                    sghGC.ledDim == int(newbright)
+                                    sghGC.ledDim == newbright
                                     matrixShow()                                    
                                     matrixBright(sghGC.ledDim / 100.0 )
 
@@ -6561,7 +6567,7 @@ def cleanup_threads(threads):
     except:
         pass
 
-
+    sghGC.capTouch = None #reset explorerhat
     print ("cleanup threads finished")
 
 
