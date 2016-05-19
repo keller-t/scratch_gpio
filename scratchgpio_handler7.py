@@ -43,6 +43,8 @@ import random
 import Queue
 from sgh_cheerlights import CheerLights
 #import uinput
+
+
 try:
     from sgh_webcamcolour import ColourTracker
 except:
@@ -51,7 +53,6 @@ except:
 #ui = UInput()
 sense = None
 SH = None
-
 
 try:
     import meArm
@@ -117,6 +118,12 @@ try:
 except:
     print "Minecraft NOT imported OK"
     pass
+
+try:
+	import cwiid
+except:
+	print "cwiid not imported"
+	pass
 
 sghCT = None #reserve for captouch
 
@@ -525,6 +532,9 @@ class ScratchSender(threading.Thread):
         lastpiAndBash = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 
         joyx, joyy, accelx, accely, accelz, button = [0, 0, 0, 0, 0, 0]
+
+        lastWiiButtons = 0	
+
         lastAngle = 0
         if wii is not None:
             sensor_name = 'angle'
@@ -864,7 +874,14 @@ class ScratchSender(threading.Thread):
                     msgQueue.put((5,"sensor-update " + bcast_str))
 
 
-
+            if wiimote is not None:
+                _buttons = wiimote.state['buttons']
+                # report button changes
+                if lastWiiButtons != _buttons:
+                    lastWiiButtons = _buttons
+                    sensor_name = 'wii_buttons'
+                    bcast_str = '"' + sensor_name + '" ' + str(_buttons)
+                    msgQueue.put((5,"sensor-update " + bcast_str))
 
             # if there is a change in the input pins
             for listIndex in range(len(sghGC.validPins)):
@@ -1700,9 +1717,10 @@ class ScratchListener(threading.Thread):
                 self.dataraw = dataraw
 
                 logging.debug("processing dataItems: %s", self.dataraw)
-                #print "Loop processing"
-                #print dataItem, " has been converted to " ,self.dataraw
-                #print
+                # TK x3
+                print "Loop processing"
+                print dataItem, " has been converted to " ,self.dataraw
+                print
                 if 'sensor-update' in self.dataraw:
                     #print "this data ignored" , dataraw
                     firstRunData = self.dataraw
@@ -3609,7 +3627,8 @@ class ScratchListener(threading.Thread):
 
                 if 'broadcast' in self.dataraw:
 
-                    #print 'broadcast:' , self.dataraw
+                    #TK
+                    print 'broadcast:' , self.dataraw
                     #print "split",  self.dataraw.split(" ")
                     if sghGC.autoLink:
                         for item in self.dataraw.split(" "):
@@ -6579,6 +6598,14 @@ try:
 except:
     pass
     #print "Colour Tracking Not Enabled"
+
+wiimote = None
+try:
+	wiimote = cwiid.Wiimote()
+	wiimote.rpt_mode = cwiid.RPT_BTN
+	print "Wiimote detected"
+except:
+	print "No wiimote found"
 
 if __name__ == '__main__':
     SCRIPTPATH = os.path.split(os.path.realpath(__file__))[0]
