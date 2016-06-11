@@ -533,7 +533,7 @@ class ScratchSender(threading.Thread):
 
         joyx, joyy, accelx, accely, accelz, button = [0, 0, 0, 0, 0, 0]
 
-        lastWiiButtons = 0	
+        btJoyX, btJoyY, btAccelX, btAccelY, btAccelZ, btButton = [0,0,0,0,0,0]	
 
         lastAngle = 0
         if wii is not None:
@@ -875,13 +875,40 @@ class ScratchSender(threading.Thread):
 
 
             if wiimote is not None:
-                _buttons = wiimote.state['buttons']
-                # report button changes
-                if lastWiiButtons != _buttons:
-                    lastWiiButtons = _buttons
-                    sensor_name = 'wii_buttons'
-                    bcast_str = '"' + sensor_name + '" ' + str(_buttons)
-                    msgQueue.put((5,"sensor-update " + bcast_str))
+                try:
+					_buttons = wiimote.state['buttons']
+					# report button changes
+					if btButton != _buttons:
+						btButton = _buttons
+						sensor_name = 'wii_buttons'
+						bcast_str = '"' + sensor_name + '" ' + str(_buttons)
+						msgQueue.put((5,"sensor-update " + bcast_str))
+                except:
+					pass
+					
+                try:
+					_x,_y,_z = wiimote.state['acc']
+                except:
+                    pass
+
+                if _x != btAccelX:
+					btAccelX = _x
+					sensor_name = 'wii_accel_x'
+					bcast_str = '"' + sensor_name + '" ' + str(_x)
+					#print bcast_str
+					msgQueue.put((5,"sensor-update " + bcast_str))	
+                if _y != btAccelY:
+					btAccelY = _y
+					sensor_name = 'wii_accel_y'
+					bcast_str = '"' + sensor_name + '" ' + str(_y)
+					#print bcast_str
+					msgQueue.put((5,"sensor-update " + bcast_str))	
+                if _z != btAccelZ:
+					btAccelZ = _z
+					sensor_name = 'wii_accel_z'
+					bcast_str = '"' + sensor_name + '" ' + str(_z)
+					#print bcast_str
+					msgQueue.put((5,"sensor-update " + bcast_str))	
 
             # if there is a change in the input pins
             for listIndex in range(len(sghGC.validPins)):
@@ -6602,7 +6629,7 @@ except:
 wiimote = None
 try:
 	wiimote = cwiid.Wiimote()
-	wiimote.rpt_mode = cwiid.RPT_BTN
+	wiimote.rpt_mode = cwiid.RPT_BTN | cwiid.RPT_ACC
 	print "Wiimote detected"
 except:
 	print "No wiimote found"
