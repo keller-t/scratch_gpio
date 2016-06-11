@@ -44,7 +44,6 @@ import Queue
 from sgh_cheerlights import CheerLights
 #import uinput
 
-
 try:
     from sgh_webcamcolour import ColourTracker
 except:
@@ -1744,10 +1743,9 @@ class ScratchListener(threading.Thread):
                 self.dataraw = dataraw
 
                 logging.debug("processing dataItems: %s", self.dataraw)
-                # TK x3
-                print "Loop processing"
-                print dataItem, " has been converted to " ,self.dataraw
-                print
+                #print "Loop processing"
+                #print dataItem, " has been converted to " ,self.dataraw
+                #print
                 if 'sensor-update' in self.dataraw:
                     #print "this data ignored" , dataraw
                     firstRunData = self.dataraw
@@ -3655,7 +3653,7 @@ class ScratchListener(threading.Thread):
                 if 'broadcast' in self.dataraw:
 
                     #TK
-                    print 'broadcast:' , self.dataraw
+                    #print 'broadcast:' , self.dataraw
                     #print "split",  self.dataraw.split(" ")
                     if sghGC.autoLink:
                         for item in self.dataraw.split(" "):
